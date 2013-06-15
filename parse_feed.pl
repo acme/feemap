@@ -37,40 +37,52 @@ foreach my $uid ( keys %$message_ids ) {
 
 use Data::Dumper; warn Dumper(\%feed_ids);
 
-my $feed = XML::Feed->parse('feeds/anandtech.feed') or die XML::Feed->errstr;
-say $feed->title;
-say $feed->link;
 
-for my $entry ($feed->entries) {
-  say $entry->title;
-  say $entry->link;
-  # fix Anandtech RSS bug, sigh
-  $entry->{entry}->{pubDate} =~ s/EDT.+$/EDT/;
-  my $feed_id = '<' . $entry->id . '@' . $feed->link . '>';
-  say $feed_id;
-  next if $feed_ids{$feed_id};
-  my $content = $entry->content;
-  #say $content->body;
-  say "";
-  my $resolver = Email::MIME::CreateHTML::Resolver::LWP->new();
-  my $email = Email::MIME->create_html(
-          header => [
-                  Date => DateTime::Format::Mail->format_datetime( $entry->issued ),
-                  From => 'acme@astray.com',
-                  To => 'acme@astray.com',
-                  Subject => $feed->title . ': ' . $entry->title,
-                  'Message-Id' => $feed_id,
-          ],
-          body => $content->body,
-          resolver => $resolver,
-  );
+foreach my $name (keys %{$config->{feeds}}) {
+  parse_feed($name);
+}
 
-  #die $email->as_string;
+sub parse_feed {
+   my $name = shift;
+   my $filename = "feeds/$name.feed";
 
-  my $uid = $imap->append_string( $mailbox, encode_utf8( $email->as_string ) )
-  or die "Could not append_string to $mailbox: ", $imap->LastError;
+  my $feed = XML::Feed->parse($filename) or die XML::Feed->errstr;
+  say $feed->title;
+  say $feed->link;
 
-  #last;
+  for my $entry ($feed->entries) {
+    say $entry->title;
+    say $entry->link;
+    # fix Anandtech RSS bug, sigh
+    $entry->{entry}->{pubDate} =~ s/EDT.+$/EDT/;
+    my $feed_id = '<' . $entry->id . '@' . $feed->link . '>';
+    say $feed_id;
+    next if $feed_ids{$feed_id};
+    my $content = $entry->content;
+    #say $content->body;
+    say "";
+    my $resolver = Email::MIME::CreateHTML::Resolver::LWP->new({
+      base => $feed->link,
+    });
+    my $email = Email::MIME->create_html(
+            header => [
+                    Date => DateTime::Format::Mail->format_datetime( $entry->issued ),
+                    From => 'acme@astray.com',
+                    To => 'acme@astray.com',
+                    Subject => $feed->title . ': ' . $entry->title,
+                    'Message-Id' => $feed_id,
+            ],
+            body => $content->body,
+            resolver => $resolver,
+    );
+
+    #die $email->as_string;
+
+    my $uid = $imap->append_string( $mailbox, encode_utf8( $email->as_string ) )
+    or die "Could not append_string to $mailbox: ", $imap->LastError;
+
+    #last;
+  }
 }
 
 # nicked from Email::Simple
