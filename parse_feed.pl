@@ -35,7 +35,7 @@ foreach my $uid ( keys %$message_ids ) {
     $feed_ids{$feed_id} = 1;
 }
 
-use Data::Dumper; warn Dumper(\%feed_ids);
+#use Data::Dumper; warn Dumper(\%feed_ids);
 
 
 foreach my $name (keys %{$config->{feeds}}) {
@@ -51,7 +51,7 @@ sub parse_feed {
   say $feed->link;
 
   for my $entry ($feed->entries) {
-    say $entry->title;
+    say encode_utf8($entry->title);
     say $entry->link;
     # fix Anandtech RSS bug, sigh
     $entry->{entry}->{pubDate} =~ s/EDT.+$/EDT/;
@@ -59,7 +59,6 @@ sub parse_feed {
     say $feed_id;
     next if $feed_ids{$feed_id};
     my $content = $entry->content;
-    #say $content->body;
     say "";
     my $resolver = Email::MIME::CreateHTML::Resolver::LWP->new({
       base => $feed->link,
@@ -69,17 +68,31 @@ sub parse_feed {
                     Date => DateTime::Format::Mail->format_datetime( $entry->issued ),
                     From => 'acme@astray.com',
                     To => 'acme@astray.com',
-                    Subject => $feed->title . ': ' . $entry->title,
+                    Subject => encode('MIME-q', $feed->title . ': ' . $entry->title),
                     'Message-Id' => $feed_id,
             ],
             body => $content->body,
+            body_attributes => { xxx => 'text/html; charset="UTF-8"' },
             resolver => $resolver,
     );
+    $email->walk_parts(sub {
+      my ($part) = @_;
+      return if $part->subparts; # multipart
+      if ( $part->content_type =~ m[text/html]i ) {
+        $part->charset_set( 'UTF-8' );
+      }
+    });
 
     #die $email->as_string;
 
-    my $uid = $imap->append_string( $mailbox, encode_utf8( $email->as_string ) )
-    or die "Could not append_string to $mailbox: ", $imap->LastError;
+    foreach (1..10) {
+      my $uid = $imap->append_string( $mailbox, encode_utf8( $email->as_string ) );
+      last if $uid;
+      warn "Could not append_string to $mailbox: ", $imap->LastError;
+      $imap = Mail::IMAPClient->new( %{ $config->{imap} } )
+          or die "new failed: $@\n";
+      $imap->select($mailbox) or die "Select $mailbox error: ", $imap->LastError;
+    }
 
     #last;
   }
