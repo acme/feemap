@@ -6,6 +6,7 @@ use Config::Tiny;
 use DateTime::Format::Mail;
 use Email::MIME::CreateHTML;
 use Encode;
+use IPC::Run3::Simple;
 use Mail::IMAPClient;
 use Try::Tiny;
 use XML::Feed;
@@ -59,6 +60,9 @@ sub parse_feed {
     say $feed_id;
     next if $feed_ids{$feed_id};
     my $content = $entry->content;
+    my $body = $content->body;
+    my ( $out, $err ) = run3( ['node', 'readability.js', '--url', $entry->link] );
+    $body = $out if $out;
     say "";
     my $resolver = Email::MIME::CreateHTML::Resolver::LWP->new({
       base => $feed->link,
@@ -71,7 +75,7 @@ sub parse_feed {
                     Subject => encode('MIME-q', $feed->title . ': ' . $entry->title),
                     'Message-Id' => $feed_id,
             ],
-            body => $content->body,
+            body => $body,
             body_attributes => { xxx => 'text/html; charset="UTF-8"' },
             resolver => $resolver,
     );
