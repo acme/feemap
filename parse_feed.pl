@@ -73,7 +73,7 @@ sub parse_feed {
     my $email = Email::MIME->create_html(
             header => [
                     Date => DateTime::Format::Mail->format_datetime( $entry->issued ),
-                    From => 'acme@astray.com',
+                    From => Email::Address->new($feed->title)->format,
                     To => 'acme@astray.com',
                     Subject => encode('MIME-q', $feed->title . ': ' . $entry->title),
                     'Message-Id' => $feed_id,
