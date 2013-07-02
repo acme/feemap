@@ -11,7 +11,9 @@ function(err, article) {
     console.error(err);
     process.exit(1);
   }
-  var html = '<html><head><meta charset="utf-8"></head><body><h1>Readability</h1>'
+  var html = '<html><head><meta charset="utf-8"></head><body><h1>'
+    + article.getTitle()
+    + '</h1>'
     + article.getContent()
     + '</body></html>';
   console.log(html);
