@@ -6,7 +6,8 @@ use Config::Tiny;
 use DateTime::Format::Mail;
 use Email::MIME::CreateHTML;
 use Encode;
-use IPC::Run3::Simple;
+use IPC::Run3;
+use LWP::Simple;
 use Mail::IMAPClient;
 use Try::Tiny;
 use XML::Feed;
@@ -61,7 +62,9 @@ sub parse_feed {
     next if $feed_ids{$feed_id};
     my $content = $entry->content;
     my $body = $content->body;
-    my ( $out, $err ) = run3( ['node', 'readability.js', '--url', $entry->link] );
+    my $html = get($entry->link);
+    run3 ['node', 'readability.js'], \$html, \my $out, \my $err;
+    warn $err if $err;
     $body = $out if $out;
     say "";
     my $resolver = Email::MIME::CreateHTML::Resolver::LWP->new({
@@ -98,7 +101,7 @@ sub parse_feed {
       $imap->select($mailbox) or die "Select $mailbox error: ", $imap->LastError;
     }
 
-    #last;
+    last;
   }
 }
 
