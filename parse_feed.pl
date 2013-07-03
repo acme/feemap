@@ -63,9 +63,10 @@ sub parse_feed {
     my $content = $entry->content;
     my $body = $content->body;
     my $html = get($entry->link);
-    run3 ['node', 'readability.js'], \$html, \my $out, \my $err;
+    my $html_utf8 = encode_utf8($html);
+    run3 ['node', 'readability.js'], \$html_utf8, \my $out, \my $err;
     warn $err if $err;
-    $body = $out if $out;
+    $body = decode_utf8($out) if defined $out;
     say "";
     my $resolver = Email::MIME::CreateHTML::Resolver::LWP->new({
       base => $feed->link,
@@ -101,7 +102,7 @@ sub parse_feed {
       $imap->select($mailbox) or die "Select $mailbox error: ", $imap->LastError;
     }
 
-    last;
+    #last;
   }
 }
 
